@@ -2,6 +2,11 @@
 
 Initial framework for a vertical-domain document question answering assistant.
 
+## Documentation
+
+- [Development dossier](DEVELOPMENT_DOSSIER.md): requirements, architecture, APIs, data model, testing and roadmap.
+- [Development record](DEVELOPMENT_RECORD.md): completed work, deployment history, current status and next steps.
+
 ## Services
 
 - `web`: Next.js upload and chat interface.
