@@ -4,14 +4,13 @@ from pathlib import Path
 
 from sqlalchemy import delete, select
 
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Document, DocumentChunk
 from app.services.chunking import split_blocks
 from app.services.embedding import EmbeddingNotConfigured, OpenAICompatibleEmbeddingClient
 from app.services.parsing import parse_document
 from app.tasks.celery_app import celery_app
-
-EMBEDDING_BATCH_SIZE = 64
 
 
 @celery_app.task(bind=True, max_retries=5, default_retry_delay=10)
@@ -52,8 +51,8 @@ async def _process_document(document_id: str) -> None:
 
             embedding_client = OpenAICompatibleEmbeddingClient()
             embeddings: list[list[float]] = []
-            for start in range(0, len(chunks), EMBEDDING_BATCH_SIZE):
-                batch = chunks[start : start + EMBEDDING_BATCH_SIZE]
+            for start in range(0, len(chunks), settings.embedding_batch_size):
+                batch = chunks[start : start + settings.embedding_batch_size]
                 result = await embedding_client.embed([chunk.text for chunk in batch])
                 embeddings.extend(result.vectors)
 

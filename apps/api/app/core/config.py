@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     embedding_api_key: str = ""
     embedding_model: str = "text-embedding-3-small"
     embedding_dimension: int = Field(default=1536, ge=1)
+    embedding_batch_size: int = Field(default=25, ge=1, le=256)
 
     retrieval_top_k: int = Field(default=5, ge=1, le=50)
     retrieval_min_similarity: float = Field(default=0.25, ge=-1.0, le=1.0)
