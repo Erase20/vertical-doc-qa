@@ -33,3 +33,26 @@ def test_demo_answer_includes_source_citation() -> None:
 
     assert "PostgreSQL" in answer
     assert "[S1]" in answer
+
+
+def test_demo_answer_does_not_echo_question() -> None:
+    question = "系统支持哪些文档格式？"
+    sources = [
+        SearchResult(
+            chunk_id=uuid4(),
+            document_id=uuid4(),
+            content=(
+                "系统支持哪些文档格式？"
+                "系统支持 PDF、DOCX 和 Markdown 三种文档格式。"
+            ),
+            score=0.8,
+            file_name="formats.md",
+            page_no=None,
+            section_path=["文档格式"],
+        )
+    ]
+
+    answer = build_demo_answer(question, sources)
+
+    assert question not in answer
+    assert "PDF、DOCX 和 Markdown" in answer

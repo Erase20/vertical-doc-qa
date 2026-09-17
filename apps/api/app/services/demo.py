@@ -44,28 +44,54 @@ def build_demo_answer(question: str, sources: list[SearchResult]) -> str:
 
     question_features = set(_features(question))
     selected: list[str] = []
-    for index, source in enumerate(sources[:3], start=1):
+    for source_index, source in enumerate(sources[:3], start=1):
+        normalized_content = _normalize_content(source.content)
         sentences = [
             sentence.strip()
-            for sentence in _SENTENCE_RE.split(source.content)
+            for sentence in _SENTENCE_RE.split(normalized_content)
             if sentence.strip()
         ]
         if not sentences:
             continue
 
-        ranked = sorted(
-            sentences,
-            key=lambda sentence: (
-                len(question_features & set(_features(sentence))),
-                -len(sentence),
-            ),
-            reverse=True,
-        )
-        excerpt = ranked[0][:320].rstrip()
-        if excerpt:
-            selected.append(f"{excerpt} [S{index}]")
+        ranked = []
+        for sentence_index, sentence in enumerate(sentences):
+            if _is_question_echo(sentence, question_features):
+                continue
+            overlap = len(question_features & set(_features(sentence)))
+            ranked.append((overlap, -len(sentence), sentence_index, sentence))
+
+        ranked.sort(reverse=True)
+        if not ranked:
+            continue
+        best_score = ranked[0][0]
+        relevance_floor = max(1, int(best_score * 0.6))
+        take = 3 if source_index == 1 else 1
+        for score, _, _, sentence in ranked[:take]:
+            if score < relevance_floor:
+                continue
+            excerpt = sentence[:240].rstrip()
+            if excerpt:
+                selected.append(f"{excerpt} [S{source_index}]")
 
     if not selected:
         return "当前文档中没有找到足够依据回答这个问题。"
 
-    return "根据检索到的资料：\n\n" + "\n\n".join(selected)
+    return "根据检索到的资料：\n\n" + "\n\n".join(selected[:4])
+
+
+def _is_question_echo(sentence: str, question_features: set[str]) -> bool:
+    normalized = sentence.strip()
+    if normalized.endswith(("？", "?")):
+        return True
+    sentence_features = set(_features(normalized))
+    if not sentence_features or not question_features:
+        return False
+    coverage = len(question_features & sentence_features) / len(question_features)
+    return coverage >= 0.8 and len(normalized) <= len("".join(question_features)) * 3
+
+
+def _normalize_content(text: str) -> str:
+    normalized = " ".join(text.split())
+    normalized = re.sub(r"(?<=[，。！？；：、])\s+", "", normalized)
+    return re.sub(r"(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])", "", normalized)
