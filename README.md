@@ -72,6 +72,22 @@ external LLM.
 
 See [DEMO_GUIDE.md](DEMO_GUIDE.md) for deployment and presentation steps.
 
+## Psychology domain MVP
+
+The psychology domain build supports three modes:
+
+- `psychoeducation`: public-facing, non-diagnostic explanations.
+- `assessment`: version-aware assessment guidance and scoring boundaries.
+- `professional`: evidence-oriented retrieval for professional materials.
+
+Documents carry domain, document type, audience, assessment version, review status
+and access-level metadata. Retrieval filters approved documents before embedding
+search, source responses expose version metadata, and crisis-language questions are
+routed to a safety response before retrieval.
+
+Sample materials are under `demo/psychology/`. The baseline evaluation set and
+runner are under `evals/psychology/`.
+
 ```dotenv
 DEMO_MODE=true
 ```

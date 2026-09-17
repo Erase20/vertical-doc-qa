@@ -13,16 +13,16 @@ from app.db.session import SessionLocal
 from app.models import Conversation, LlmCall, Message, RetrievalEvent
 from app.schemas.api import ChatRequest
 from app.services.demo import build_demo_answer
+from app.services.domain_profiles import (
+    get_allowed_access_levels,
+    get_domain_profile,
+)
 from app.services.embedding import EmbeddingNotConfigured, get_embedding_client
 from app.services.llm import LlmNotConfigured, OpenAICompatibleChatClient
-from app.vectorstores import get_vector_store
+from app.services.safety import crisis_support_message, detect_safety_issue
+from app.vectorstores import SearchFilters, get_vector_store
 
 router = APIRouter()
-
-SYSTEM_PROMPT = """You are a strict vertical-domain document QA assistant.
-Use only the supplied source excerpts. If the excerpts do not contain enough
-evidence, say so explicitly. Cite supporting facts as [S1], [S2], and so on.
-Never invent a citation number that is not present in the supplied sources."""
 
 
 @router.post("/stream")
@@ -48,8 +48,32 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         {
             "request_id": str(request_id),
             "conversation_id": str(conversation_id) if conversation_id else None,
+            "mode": payload.mode,
         },
     )
+
+    safety = detect_safety_issue(payload.question)
+    if safety.level == "crisis":
+        yield _sse(
+            "safety",
+            {
+                "level": safety.level,
+                "action": safety.action,
+                "request_id": str(request_id),
+            },
+        )
+        answer = crisis_support_message()
+        async for event in _stream_fixed_answer(answer):
+            yield event
+        yield _sse(
+            "done",
+            {
+                "message_id": None,
+                "finish_reason": "crisis_support",
+                "total_ms": int((time.perf_counter() - started) * 1000),
+            },
+        )
+        return
 
     if not settings.demo_mode and not settings.embedding_api_key:
         yield _sse(
@@ -74,17 +98,24 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         )
         return
 
+    profile = get_domain_profile(payload.mode)
+
     async with SessionLocal() as db:
         conversation = await _get_or_create_conversation(
             db,
             conversation_id,
             payload.knowledge_base_id,
             payload.question,
+            payload.mode,
         )
         conversation_id = conversation.id
         yield _sse(
             "meta",
-            {"request_id": str(request_id), "conversation_id": str(conversation_id)},
+            {
+                "request_id": str(request_id),
+                "conversation_id": str(conversation_id),
+                "mode": payload.mode,
+            },
         )
 
         user_message = Message(
@@ -92,6 +123,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
             role="user",
             content=payload.question,
             status="completed",
+            safety_level=safety.level,
             request_id=request_id,
         )
         db.add(user_message)
@@ -114,11 +146,40 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         embedding_ms = int((time.perf_counter() - embedding_started) * 1000)
 
         search_started = time.perf_counter()
+        requested_doc_type = payload.filters.doc_type
+        if requested_doc_type and requested_doc_type not in profile.default_doc_types:
+            yield _sse(
+                "error",
+                {
+                    "code": "INVALID_MODE_FILTER",
+                    "message": (
+                        f"Document type '{requested_doc_type}' is not available "
+                        f"in {payload.mode} mode."
+                    ),
+                    "request_id": str(request_id),
+                    "retryable": False,
+                },
+            )
+            return
+
+        search_filters = SearchFilters(
+            domain=profile.domain,
+            doc_types=(
+                (requested_doc_type,)
+                if requested_doc_type
+                else profile.default_doc_types
+            ),
+            allowed_access_levels=get_allowed_access_levels(),
+            audience=payload.filters.audience,
+            assessment_code=payload.filters.assessment_code,
+            assessment_version=payload.filters.assessment_version,
+        )
         try:
             results = await get_vector_store(db).search(
                 query_vector=embedding_result.vectors[0],
                 top_k=settings.retrieval_top_k,
                 knowledge_base_id=payload.knowledge_base_id,
+                filters=search_filters,
             )
         except NotImplementedError as exc:
             yield _sse(
@@ -144,6 +205,11 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                 "section": " / ".join(result.section_path) if result.section_path else None,
                 "score": round(result.score, 4),
                 "excerpt": result.content[:300],
+                "doc_type": result.doc_type,
+                "audience": result.audience,
+                "assessment_code": result.assessment_code,
+                "assessment_version": result.assessment_version,
+                "review_status": result.review_status,
             }
             for index, result in enumerate(results, start=1)
         ]
@@ -153,6 +219,8 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                 "name": result.file_name,
                 "page": result.page_no,
                 "section": " / ".join(result.section_path) if result.section_path else None,
+                "assessment_code": result.assessment_code,
+                "assessment_version": result.assessment_version,
                 "content": result.content,
             }
             for index, result in enumerate(results, start=1)
@@ -169,6 +237,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                     "message_id": None,
                     "finish_reason": "insufficient_context",
                     "total_ms": int((time.perf_counter() - started) * 1000),
+                    "mode": payload.mode,
                 },
             )
             return
@@ -178,7 +247,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         first_token_ms: int | None = None
 
         if settings.demo_mode:
-            answer = build_demo_answer(payload.question, results)
+            answer = build_demo_answer(payload.question, results, payload.mode)
             first_token_ms = int((time.perf_counter() - started) * 1000)
             assistant_parts.append(answer)
             for offset in range(0, len(answer), 24):
@@ -186,7 +255,10 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                 await asyncio.sleep(0)
         else:
             try:
-                async for token in OpenAICompatibleChatClient().stream(SYSTEM_PROMPT, user_prompt):
+                async for token in OpenAICompatibleChatClient().stream(
+                    profile.system_prompt,
+                    user_prompt,
+                ):
                     if first_token_ms is None:
                         first_token_ms = int((time.perf_counter() - started) * 1000)
                     assistant_parts.append(token)
@@ -205,7 +277,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
 
         answer = "".join(assistant_parts)
         llm_latency_ms = int((time.perf_counter() - started) * 1000)
-        input_tokens = _estimate_tokens(SYSTEM_PROMPT) + _estimate_tokens(user_prompt)
+        input_tokens = _estimate_tokens(profile.system_prompt) + _estimate_tokens(user_prompt)
         output_tokens = _estimate_tokens(answer)
 
         assistant_message = Message(
@@ -223,6 +295,17 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                 message_id=assistant_message.id,
                 query=payload.question,
                 top_k=settings.retrieval_top_k,
+                mode=payload.mode,
+                filters_json=payload.filters.model_dump(exclude_none=True),
+                source_versions=[
+                    {
+                        "document_id": str(result.document_id),
+                        "assessment_code": result.assessment_code,
+                        "assessment_version": result.assessment_version,
+                        "review_status": result.review_status,
+                    }
+                    for result in results
+                ],
                 chunk_ids=[str(result.chunk_id) for result in results],
                 scores=[result.score for result in results],
                 embedding_ms=embedding_ms,
@@ -243,6 +326,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                 latency_ms=llm_latency_ms,
                 first_token_ms=first_token_ms,
                 success=True,
+                metadata_json={"mode": payload.mode},
             )
         )
         await db.commit()
@@ -264,6 +348,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
                 "message_id": str(assistant_message.id),
                 "finish_reason": "stop",
                 "total_ms": int((time.perf_counter() - started) * 1000),
+                "mode": payload.mode,
             },
         )
 
@@ -273,6 +358,7 @@ async def _get_or_create_conversation(
     conversation_id,
     knowledge_base_id: str,
     title: str,
+    mode: str,
 ) -> Conversation:
     if conversation_id is not None:
         conversation = await db.scalar(
@@ -284,6 +370,7 @@ async def _get_or_create_conversation(
     conversation = Conversation(
         id=conversation_id,
         knowledge_base_id=knowledge_base_id,
+        mode=mode,
         title=title[:255],
     )
     db.add(conversation)
@@ -297,7 +384,9 @@ def _build_prompt(question: str, sources: list[dict]) -> str:
         (
             f"[{source['id']}]\n"
             f"Source: {source['name']}, page: {source['page'] or 'n/a'}, "
-            f"section: {source['section'] or 'n/a'}\n"
+            f"section: {source['section'] or 'n/a'}, "
+            f"assessment: {source['assessment_code'] or 'n/a'}, "
+            f"version: {source['assessment_version'] or 'n/a'}\n"
             f"Content: {source['content']}"
         )
         for source in sources

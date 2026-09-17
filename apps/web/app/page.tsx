@@ -5,9 +5,22 @@ import { Database, FileText } from "lucide-react";
 
 import { ChatPanel } from "@/components/ChatPanel";
 import { DocumentPanel } from "@/components/DocumentPanel";
+import { ModeTabs } from "@/components/ModeTabs";
+import { RetrievalFilters } from "@/components/RetrievalFilters";
 import { SourcePanel } from "@/components/SourcePanel";
 import { listDocuments } from "@/lib/api";
-import type { DocumentItem, SourceItem } from "@/lib/types";
+import type {
+  DomainMode,
+  DocumentItem,
+  RetrievalFilters as Filters,
+  SourceItem
+} from "@/lib/types";
+
+const DEFAULT_FILTERS: Record<DomainMode, Filters> = {
+  psychoeducation: { doc_type: "article" },
+  assessment: { doc_type: "scale_manual" },
+  professional: { doc_type: "paper" }
+};
 
 export default function HomePage() {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
@@ -15,6 +28,8 @@ export default function HomePage() {
   const [activeSource, setActiveSource] = useState<string | null>(null);
   const [loadingDocuments, setLoadingDocuments] = useState(true);
   const [documentError, setDocumentError] = useState<string | null>(null);
+  const [mode, setMode] = useState<DomainMode>("psychoeducation");
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS.psychoeducation);
 
   const refreshDocuments = useCallback(async () => {
     try {
@@ -38,6 +53,13 @@ export default function HomePage() {
 
   const readyCount = documents.filter((document) => document.status === "ready").length;
 
+  function handleModeChange(nextMode: DomainMode) {
+    setMode(nextMode);
+    setFilters(DEFAULT_FILTERS[nextMode]);
+    setSources([]);
+    setActiveSource(null);
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -46,10 +68,11 @@ export default function HomePage() {
             <Database size={18} />
           </span>
           <div>
-            <strong>文档问答助手</strong>
-            <span>垂直知识库工作台</span>
+            <strong>心理知识工作台</strong>
+            <span>科普 · 测评 · 专业资料</span>
           </div>
         </div>
+        <ModeTabs mode={mode} onChange={handleModeChange} />
         <div className="system-summary" aria-label="知识库摘要">
           <span>
             <FileText size={15} />
@@ -59,6 +82,10 @@ export default function HomePage() {
         </div>
       </header>
 
+      <div className="domain-toolbar">
+        <RetrievalFilters mode={mode} value={filters} onChange={setFilters} />
+      </div>
+
       <div className="workspace">
         <DocumentPanel
           documents={documents}
@@ -67,6 +94,8 @@ export default function HomePage() {
           onRefresh={refreshDocuments}
         />
         <ChatPanel
+          mode={mode}
+          filters={filters}
           onSources={(nextSources) => {
             setSources(nextSources);
             setActiveSource(nextSources[0]?.id ?? null);
@@ -82,4 +111,3 @@ export default function HomePage() {
     </main>
   );
 }
-

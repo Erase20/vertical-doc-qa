@@ -1,24 +1,60 @@
 "use client";
 
-import { FormEvent, KeyboardEvent, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { MessageSquareText, Send, Square } from "lucide-react";
 
+import { SafetyNotice } from "@/components/SafetyNotice";
 import { streamChat } from "@/lib/api";
-import type { ChatMessage, SourceItem } from "@/lib/types";
+import type {
+  ChatMessage,
+  DomainMode,
+  RetrievalFilters,
+  SourceItem
+} from "@/lib/types";
 
 interface Props {
+  mode: DomainMode;
+  filters: RetrievalFilters;
   onSources: (sources: SourceItem[]) => void;
   onCitation: (sourceId: string) => void;
 }
 
-export function ChatPanel({ onSources, onCitation }: Props) {
+const MODE_COPY: Record<DomainMode, { title: string; description: string; limitation: string }> = {
+  psychoeducation: {
+    title: "了解心理健康知识",
+    description: "回答用于心理科普，不用于诊断个人状态。",
+    limitation: "内容仅用于健康教育，不能替代专业评估。"
+  },
+  assessment: {
+    title: "查询测评说明",
+    description: "结果会尽量标注测评版本、适用人群和计分限制。",
+    limitation: "量表分数不能单独作为临床诊断依据。"
+  },
+  professional: {
+    title: "检索专业资料",
+    description: "优先使用指南、政策、综述和研究资料。",
+    limitation: "请结合证据年份、研究人群和适用边界判断结论。"
+  }
+};
+
+export function ChatPanel({ mode, filters, onSources, onCitation }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [question, setQuestion] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [safetyLevel, setSafetyLevel] = useState<"crisis" | "normal" | null>(null);
   const conversationId = useRef<string | null>(null);
   const abortController = useRef<AbortController | null>(null);
   const messageSequence = useRef(0);
+  const modeCopy = MODE_COPY[mode];
+
+  useEffect(() => {
+    conversationId.current = null;
+    setMessages([]);
+    setQuestion("");
+    setError(null);
+    setSafetyLevel(null);
+  }, [mode]);
 
   async function submitQuestion(event?: FormEvent) {
     event?.preventDefault();
@@ -42,6 +78,7 @@ export function ChatPanel({ onSources, onCitation }: Props) {
     setQuestion("");
     setStreaming(true);
     setError(null);
+    setSafetyLevel(null);
     onSources([]);
 
     const controller = new AbortController();
@@ -52,7 +89,9 @@ export function ChatPanel({ onSources, onCitation }: Props) {
         {
           question: normalizedQuestion,
           conversation_id: conversationId.current,
-          knowledge_base_id: "default"
+          knowledge_base_id: "psychology",
+          mode,
+          filters
         },
         {
           onMeta: (meta) => {
@@ -70,6 +109,9 @@ export function ChatPanel({ onSources, onCitation }: Props) {
           },
           onError: (streamError) => {
             setError(`${streamError.code}: ${streamError.message}`);
+          },
+          onSafety: (safety) => {
+            setSafetyLevel(safety.level);
           }
         },
         controller.signal
@@ -110,8 +152,8 @@ export function ChatPanel({ onSources, onCitation }: Props) {
           <div className="empty-chat">
             <div className="empty-chat-inner">
               <MessageSquareText size={32} />
-              <h1>询问你的资料</h1>
-              <p>上传并完成索引后，答案会附上对应的文档片段。</p>
+              <h1>{modeCopy.title}</h1>
+              <p>{modeCopy.description}</p>
             </div>
           </div>
         ) : (
@@ -131,7 +173,9 @@ export function ChatPanel({ onSources, onCitation }: Props) {
       </div>
 
       <div className="composer-wrap">
+        {safetyLevel === "crisis" && <SafetyNotice level={safetyLevel} />}
         {error && <div className="error-banner">{error}</div>}
+        <p className="answer-limitation">{modeCopy.limitation}</p>
         <form className="composer" onSubmit={(event) => void submitQuestion(event)}>
           <textarea
             value={question}
@@ -189,4 +233,3 @@ function renderAssistantContent(content: string, onCitation: (sourceId: string) 
     );
   });
 }
-

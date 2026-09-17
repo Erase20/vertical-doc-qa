@@ -4,6 +4,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.core.domain import (
+    Audience,
+    DocumentType,
+    DomainMode,
+)
+
 
 class HealthResponse(BaseModel):
     status: str
@@ -31,6 +37,13 @@ class DocumentRead(BaseModel):
     mime_type: str
     file_size: int
     status: str
+    domain: str
+    doc_type: str
+    audience: str
+    assessment_code: str | None
+    assessment_version: str | None
+    access_level: str
+    review_status: str
     error_code: str | None
     error_message: str | None
     chunk_count: int
@@ -49,10 +62,19 @@ class DocumentUploadResponse(DocumentRead):
     duplicate: bool = False
 
 
+class RetrievalFilters(BaseModel):
+    doc_type: DocumentType | None = None
+    audience: Audience | None = None
+    assessment_code: str | None = Field(default=None, min_length=1, max_length=64)
+    assessment_version: str | None = Field(default=None, min_length=1, max_length=32)
+
+
 class ChatRequest(BaseModel):
     question: str = Field(min_length=1, max_length=8000)
     conversation_id: UUID | None = None
     knowledge_base_id: str = Field(default="default", min_length=1, max_length=64)
+    mode: DomainMode = "psychoeducation"
+    filters: RetrievalFilters = Field(default_factory=RetrievalFilters)
 
 
 class SourceRead(BaseModel):
@@ -64,6 +86,11 @@ class SourceRead(BaseModel):
     section: str | None
     score: float
     excerpt: str
+    doc_type: str
+    audience: str
+    assessment_code: str | None
+    assessment_version: str | None
+    review_status: str
 
 
 class ErrorBody(BaseModel):

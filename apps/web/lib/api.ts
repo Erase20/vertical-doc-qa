@@ -1,5 +1,6 @@
 import type {
   ChatRequest,
+  DocumentUploadMetadata,
   DocumentItem,
   DocumentListResponse,
   SourceItem,
@@ -29,10 +30,17 @@ export async function listDocuments(): Promise<DocumentListResponse> {
   return response.json();
 }
 
-export async function uploadDocument(file: File): Promise<DocumentItem> {
+export async function uploadDocument(
+  file: File,
+  metadata: DocumentUploadMetadata
+): Promise<DocumentItem> {
   const body = new FormData();
   body.append("file", file);
-  body.append("knowledge_base_id", "default");
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value !== undefined && value !== "") {
+      body.append(key, value);
+    }
+  }
 
   const response = await fetch(`${API_BASE_URL}/documents`, {
     method: "POST",
@@ -129,10 +137,11 @@ function dispatchFrame(frame: string, callbacks: StreamCallbacks): void {
     callbacks.onToken?.(data.delta);
   } else if (eventName === "usage") {
     callbacks.onUsage?.(data);
+  } else if (eventName === "safety") {
+    callbacks.onSafety?.(data);
   } else if (eventName === "done") {
     callbacks.onDone?.(data);
   } else if (eventName === "error") {
     callbacks.onError?.(data);
   }
 }
-

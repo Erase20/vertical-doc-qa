@@ -38,7 +38,11 @@ def embed_text(text: str, dimension: int) -> list[float]:
     return [value / norm for value in vector]
 
 
-def build_demo_answer(question: str, sources: list[SearchResult]) -> str:
+def build_demo_answer(
+    question: str,
+    sources: list[SearchResult],
+    mode: str = "psychoeducation",
+) -> str:
     if not sources:
         return "当前文档中没有找到足够依据回答这个问题。"
 
@@ -77,7 +81,13 @@ def build_demo_answer(question: str, sources: list[SearchResult]) -> str:
     if not selected:
         return "当前文档中没有找到足够依据回答这个问题。"
 
-    return "根据检索到的资料：\n\n" + "\n\n".join(selected[:4])
+    prefixes = {
+        "psychoeducation": "根据检索到的科普资料：",
+        "assessment": "根据已审核的测评资料：",
+        "professional": "根据检索到的专业资料：",
+    }
+    prefix = prefixes.get(mode, "根据检索到的资料：")
+    return f"{prefix}\n\n" + "\n\n".join(selected[:4])
 
 
 def _is_question_echo(sentence: str, question_features: set[str]) -> bool:

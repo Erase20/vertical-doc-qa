@@ -114,10 +114,93 @@ button:disabled {
   color: var(--teal);
 }
 
+.mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background: #edf0f2;
+  border-radius: 7px;
+}
+
+.mode-tab {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.mode-tab:hover {
+  color: var(--ink);
+}
+
+.mode-tab.active {
+  color: var(--teal);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(23 33 43 / 10%);
+}
+
+.domain-toolbar {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 7px 20px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.retrieval-filters {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  width: 100%;
+}
+
+.filter-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.retrieval-filters select,
+.retrieval-filters input,
+.upload-fields select,
+.upload-fields input {
+  min-height: 32px;
+  min-width: 0;
+  padding: 0 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  outline: 0;
+  font-size: 11px;
+}
+
+.retrieval-filters select:focus,
+.retrieval-filters input:focus,
+.upload-fields select:focus,
+.upload-fields input:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px var(--teal-soft);
+}
+
 .workspace {
   display: grid;
   grid-template-columns: minmax(240px, 280px) minmax(360px, 1fr) minmax(260px, 340px);
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 112px);
 }
 
 .panel {
@@ -199,6 +282,24 @@ button:disabled {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.5;
+}
+
+.upload-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.upload-fields label {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.upload-fields label span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 650;
 }
 
 .primary-button,
@@ -345,7 +446,7 @@ button:disabled {
   min-width: 0;
   display: grid;
   grid-template-rows: 56px minmax(0, 1fr) auto;
-  height: calc(100vh - 64px);
+  height: calc(100vh - 112px);
 }
 
 .messages {
@@ -424,6 +525,40 @@ button:disabled {
   padding: 12px clamp(18px, 5vw, 72px) 18px;
   background: var(--surface);
   border-top: 1px solid var(--line);
+}
+
+.safety-notice {
+  max-width: 780px;
+  display: flex;
+  gap: 9px;
+  margin: 0 auto 10px;
+  padding: 10px 11px;
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-radius: 6px;
+}
+
+.safety-notice svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.safety-notice strong {
+  display: block;
+  font-size: 12px;
+}
+
+.safety-notice p,
+.answer-limitation {
+  margin: 3px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.answer-limitation {
+  max-width: 780px;
+  margin: 0 auto 8px;
+  color: var(--muted);
 }
 
 .composer {
@@ -520,6 +655,20 @@ button:disabled {
   line-height: 1.55;
 }
 
+.source-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.source-meta span {
+  padding: 2px 5px;
+  color: var(--muted);
+  background: #eef1f3;
+  border-radius: 4px;
+  font-size: 10px;
+}
+
 .source-excerpt {
   display: -webkit-box;
   overflow: hidden;
@@ -571,9 +720,28 @@ button:disabled {
     padding: 12px 14px;
   }
 
+  .mode-tabs {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .mode-tab {
+    flex: 1 0 auto;
+    justify-content: center;
+  }
+
   .system-summary {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .domain-toolbar {
+    padding: 8px 14px;
+  }
+
+  .retrieval-filters {
+    flex-wrap: wrap;
+    justify-content: flex-start;
   }
 
   .workspace {
@@ -594,7 +762,7 @@ button:disabled {
   }
 
   .chat-panel {
-    height: 680px;
+    height: 720px;
   }
 
   .messages,
@@ -603,4 +771,3 @@ button:disabled {
     padding-left: 14px;
   }
 }
-

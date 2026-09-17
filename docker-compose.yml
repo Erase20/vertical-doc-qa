@@ -60,6 +60,10 @@ services:
       APP_API_KEY: ${APP_API_KEY:-}
       APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       DEMO_MODE: ${DEMO_MODE:-false}
+      ACCESS_LEVEL_CLEARANCE: ${ACCESS_LEVEL_CLEARANCE:-public}
+      CRISIS_SUPPORT_ENABLED: ${CRISIS_SUPPORT_ENABLED:-true}
+      CRISIS_REGION: ${CRISIS_REGION:-CN}
+      CRISIS_SUPPORT_MESSAGE: ${CRISIS_SUPPORT_MESSAGE:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://docqa:docqa@postgres:5432/docqa}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}

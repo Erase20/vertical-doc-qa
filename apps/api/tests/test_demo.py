@@ -26,6 +26,11 @@ def test_demo_answer_includes_source_citation() -> None:
             file_name="architecture.md",
             page_no=None,
             section_path=["系统架构"],
+            doc_type="guide",
+            audience="public",
+            assessment_code=None,
+            assessment_version=None,
+            review_status="approved",
         )
     ]
 
@@ -49,6 +54,11 @@ def test_demo_answer_does_not_echo_question() -> None:
             file_name="formats.md",
             page_no=None,
             section_path=["文档格式"],
+            doc_type="article",
+            audience="public",
+            assessment_code=None,
+            assessment_version=None,
+            review_status="approved",
         )
     ]
 
