@@ -1,3 +1,4 @@
+import asyncio
 import json
 import time
 import uuid
@@ -11,7 +12,8 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Conversation, LlmCall, Message, RetrievalEvent
 from app.schemas.api import ChatRequest
-from app.services.embedding import EmbeddingNotConfigured, OpenAICompatibleEmbeddingClient
+from app.services.demo import build_demo_answer
+from app.services.embedding import EmbeddingNotConfigured, get_embedding_client
 from app.services.llm import LlmNotConfigured, OpenAICompatibleChatClient
 from app.vectorstores import get_vector_store
 
@@ -49,7 +51,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         },
     )
 
-    if not settings.embedding_api_key:
+    if not settings.demo_mode and not settings.embedding_api_key:
         yield _sse(
             "error",
             {
@@ -60,7 +62,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
             },
         )
         return
-    if not settings.llm_api_key:
+    if not settings.demo_mode and not settings.llm_api_key:
         yield _sse(
             "error",
             {
@@ -97,7 +99,7 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
 
         embedding_started = time.perf_counter()
         try:
-            embedding_result = await OpenAICompatibleEmbeddingClient().embed([payload.question])
+            embedding_result = await get_embedding_client().embed([payload.question])
         except EmbeddingNotConfigured:
             yield _sse(
                 "error",
@@ -130,11 +132,8 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
             )
             return
         search_ms = int((time.perf_counter() - search_started) * 1000)
-        results = [
-            result
-            for result in results
-            if result.score >= settings.retrieval_min_similarity
-        ]
+        minimum_similarity = 0.05 if settings.demo_mode else settings.retrieval_min_similarity
+        results = [result for result in results if result.score >= minimum_similarity]
         sources = [
             {
                 "id": f"S{index}",
@@ -178,23 +177,31 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         assistant_parts: list[str] = []
         first_token_ms: int | None = None
 
-        try:
-            async for token in OpenAICompatibleChatClient().stream(SYSTEM_PROMPT, user_prompt):
-                if first_token_ms is None:
-                    first_token_ms = int((time.perf_counter() - started) * 1000)
-                assistant_parts.append(token)
-                yield _sse("token", {"delta": token})
-        except LlmNotConfigured:
-            yield _sse(
-                "error",
-                {
-                    "code": "LLM_NOT_CONFIGURED",
-                    "message": "LLM client is not configured.",
-                    "request_id": str(request_id),
-                    "retryable": False,
-                },
-            )
-            return
+        if settings.demo_mode:
+            answer = build_demo_answer(payload.question, results)
+            first_token_ms = int((time.perf_counter() - started) * 1000)
+            assistant_parts.append(answer)
+            for offset in range(0, len(answer), 24):
+                yield _sse("token", {"delta": answer[offset : offset + 24]})
+                await asyncio.sleep(0)
+        else:
+            try:
+                async for token in OpenAICompatibleChatClient().stream(SYSTEM_PROMPT, user_prompt):
+                    if first_token_ms is None:
+                        first_token_ms = int((time.perf_counter() - started) * 1000)
+                    assistant_parts.append(token)
+                    yield _sse("token", {"delta": token})
+            except LlmNotConfigured:
+                yield _sse(
+                    "error",
+                    {
+                        "code": "LLM_NOT_CONFIGURED",
+                        "message": "LLM client is not configured.",
+                        "request_id": str(request_id),
+                        "retryable": False,
+                    },
+                )
+                return
 
         answer = "".join(assistant_parts)
         llm_latency_ms = int((time.perf_counter() - started) * 1000)
@@ -225,8 +232,8 @@ async def _generate_events(payload: ChatRequest) -> AsyncIterator[str]:
         db.add(
             LlmCall(
                 request_id=request_id,
-                provider="openai-compatible",
-                model=settings.llm_model,
+                provider="demo" if settings.demo_mode else "openai-compatible",
+                model="demo-extractive" if settings.demo_mode else settings.llm_model,
                 operation="chat",
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,

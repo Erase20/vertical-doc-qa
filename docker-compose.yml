@@ -59,6 +59,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       APP_API_KEY: ${APP_API_KEY:-}
       APP_CORS_ORIGINS: ${APP_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      DEMO_MODE: ${DEMO_MODE:-false}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://docqa:docqa@postgres:5432/docqa}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}
@@ -118,6 +119,7 @@ services:
       ]
     environment:
       APP_ENV: ${APP_ENV:-development}
+      DEMO_MODE: ${DEMO_MODE:-false}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://docqa:docqa@postgres:5432/docqa}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       UPLOAD_DIR: ${UPLOAD_DIR:-/data/uploads}

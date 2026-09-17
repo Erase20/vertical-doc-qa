@@ -48,6 +48,7 @@ async def ready() -> ReadinessResponse:
         database=database_status,
         redis=redis_status,
         vector_store=settings.vector_store,
-        model_configured=bool(settings.embedding_api_key and settings.llm_api_key),
+        model_configured=settings.demo_mode
+        or bool(settings.embedding_api_key and settings.llm_api_key),
+        model_mode="demo" if settings.demo_mode else "live",
     )
-

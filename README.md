@@ -61,3 +61,26 @@ npm run dev
 
 The API and worker expect PostgreSQL and Redis. Docker Compose is the supported
 way to run those dependencies.
+
+## Zero-cost interview demo
+
+Set `DEMO_MODE=true` to run the complete upload, indexing, retrieval, streaming
+answer and citation flow without model credentials. The demo uses deterministic
+local embeddings and an extractive answer generator; it does not call an
+external LLM.
+
+See [DEMO_GUIDE.md](DEMO_GUIDE.md) for deployment and presentation steps.
+
+```dotenv
+DEMO_MODE=true
+```
+
+Start or restart the API and worker:
+
+```bash
+docker compose up -d --build api worker
+```
+
+To switch back to a real model, set `DEMO_MODE=false`, configure the LLM and
+embedding credentials, and rebuild. Existing chunks must be reindexed when
+changing between demo and real embeddings.

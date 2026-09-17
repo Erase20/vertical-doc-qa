@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     app_cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     api_v1_prefix: str = "/api/v1"
     log_level: str = "INFO"
+    demo_mode: bool = False
 
     database_url: str = "postgresql+asyncpg://docqa:docqa@localhost:5432/docqa"
     redis_url: str = "redis://localhost:6379/0"

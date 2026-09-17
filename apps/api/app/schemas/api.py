@@ -17,6 +17,7 @@ class ReadinessResponse(BaseModel):
     redis: str
     vector_store: str
     model_configured: bool
+    model_mode: Literal["demo", "live"]
 
 
 class DocumentRead(BaseModel):
@@ -93,4 +94,3 @@ class CallMetric(BaseModel):
 class CallMetricList(BaseModel):
     items: list[CallMetric]
     total: int
-

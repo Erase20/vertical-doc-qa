@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import httpx
 
 from app.core.config import settings
+from app.services.demo import embed_text
 
 
 class EmbeddingNotConfigured(RuntimeError):
@@ -47,3 +48,20 @@ class OpenAICompatibleEmbeddingClient:
             input_tokens=int(usage.get("prompt_tokens", 0)),
             latency_ms=int((time.perf_counter() - started) * 1000),
         )
+
+
+class DeterministicEmbeddingClient:
+    async def embed(self, texts: list[str]) -> EmbeddingResult:
+        started = time.perf_counter()
+        vectors = [embed_text(text, settings.embedding_dimension) for text in texts]
+        return EmbeddingResult(
+            vectors=vectors,
+            input_tokens=sum(max(1, len(text) // 2) for text in texts),
+            latency_ms=int((time.perf_counter() - started) * 1000),
+        )
+
+
+def get_embedding_client() -> OpenAICompatibleEmbeddingClient | DeterministicEmbeddingClient:
+    if settings.demo_mode:
+        return DeterministicEmbeddingClient()
+    return OpenAICompatibleEmbeddingClient()

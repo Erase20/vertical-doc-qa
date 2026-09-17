@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import Document, DocumentChunk
 from app.services.chunking import split_blocks
-from app.services.embedding import EmbeddingNotConfigured, OpenAICompatibleEmbeddingClient
+from app.services.embedding import EmbeddingNotConfigured, get_embedding_client
 from app.services.parsing import parse_document
 from app.tasks.celery_app import celery_app
 
@@ -49,7 +49,7 @@ async def _process_document(document_id: str) -> None:
             document.status = "embedding"
             await db.commit()
 
-            embedding_client = OpenAICompatibleEmbeddingClient()
+            embedding_client = get_embedding_client()
             embeddings: list[list[float]] = []
             for start in range(0, len(chunks), settings.embedding_batch_size):
                 batch = chunks[start : start + settings.embedding_batch_size]
