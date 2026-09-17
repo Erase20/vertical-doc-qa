@@ -6,6 +6,7 @@ Initial framework for a vertical-domain document question answering assistant.
 
 - [Development dossier](DEVELOPMENT_DOSSIER.md): requirements, architecture, APIs, data model, testing and roadmap.
 - [Development record](DEVELOPMENT_RECORD.md): completed work, deployment history, current status and next steps.
+- [Psychology redevelopment plan](PSYCHOLOGY_REDEVELOPMENT.md): minimum domain adaptation plan for psychoeducation, assessment guidance and professional reference retrieval.
 
 ## Services
 
